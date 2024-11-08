@@ -1,8 +1,16 @@
-import type { ParsedUrlQuery } from "querystring";
-import type { UrlWithParsedQuery } from "url";
 import { discover } from "./discover";
 import type { OpenId, ProviderResponse } from "./openid";
-import url from "url";
+
+/**
+ * Helper function since URL.parse is not working in Node.js context
+ */
+const parseURL = (val: string): URL | null => {
+  try {
+    return new URL(val);
+  } catch {
+    return null;
+  }
+};
 
 const FIVE_MINUTES_IN_MS = 300000; // microseconds
 
@@ -30,8 +38,8 @@ export class SteamOpenIdClient implements OpenId {
   }
 
   async validateResponse(responseUrl: string, returnUrl: string) {
-    const assertionUrl = url.parse(responseUrl.trim(), true);
-    const params = assertionUrl.query;
+    const assertionUrl = new URL(responseUrl.trim());
+    const params = assertionUrl.searchParams;
 
     this.checkReturnUrlsAreValid(assertionUrl, returnUrl);
 
@@ -78,34 +86,32 @@ export class SteamOpenIdClient implements OpenId {
       throw new Error("No provider endpoint specified.");
     }
 
-    return await this.buildUrl(provider.endpoint, params);
+    return this.buildUrl(provider.endpoint, params);
   }
 
   private checkReturnUrlsAreValid(
-    openIdReturnUrl: UrlWithParsedQuery,
+    openIdReturnUrl: URL,
     clientReturnUrl: string,
   ): void {
     if (clientReturnUrl === "") {
       throw new Error("OpenId Client return url is empty.");
     }
 
-    const openIdReturnTo = openIdReturnUrl.query["openid.return_to"] as
-      | string
-      | undefined;
+    const openIdReturnTo = openIdReturnUrl.searchParams.get("openid.return_to");
     if (!openIdReturnTo) {
       throw new Error(
         "openId.return_to query param is missing in the request URL.",
       );
     }
 
-    const parsedOpenIdReturnTo = url.parse(openIdReturnTo, true);
+    const parsedOpenIdReturnTo = parseURL(openIdReturnTo);
     if (!parsedOpenIdReturnTo) {
       throw new Error(
         `openId.return_to URL (${openIdReturnTo}) could not been parsed.`,
       );
     }
 
-    const parsedClientReturnUrl = url.parse(clientReturnUrl, true);
+    const parsedClientReturnUrl = parseURL(clientReturnUrl);
     if (!parsedClientReturnUrl) {
       throw new Error(
         `OpenID Client return url (${clientReturnUrl}) could not been parsed.`,
@@ -147,15 +153,12 @@ export class SteamOpenIdClient implements OpenId {
     }
   }
 
-  private async checkNonce(params: ParsedUrlQuery): Promise<void> {
-    if (
-      "openid.ns" in params &&
-      !(params?.["openid.ns"] as string).includes("2.0")
-    ) {
+  private async checkNonce(params: URLSearchParams): Promise<void> {
+    if (params.has("openid.ns") && !params.get("openid.ns")?.includes("2.0")) {
       return; // Open ID 1.1 but not an Open ID 2.0 compatibility mode (ns with 2.0 indicates compatibility mode)
     }
 
-    const nonce = params["openid.response_nonce"] as string | undefined;
+    const nonce = params.get("openid.response_nonce");
     if (!nonce) {
       throw new Error(
         `Missing response nonce. Request params: ${JSON.stringify(params)}`,
@@ -206,12 +209,12 @@ export class SteamOpenIdClient implements OpenId {
     this.nonces[nonce] = date;
   }
 
-  private async checkParams(params?: ParsedUrlQuery): Promise<void> {
+  private async checkParams(params?: URLSearchParams): Promise<void> {
     if (params === undefined) {
       throw new Error("Assertion request is malformed. Empty params.");
-    } else if (params["openid.mode"] === "error") {
-      throw new Error(params["openid.error"] as string);
-    } else if (params["openid.mode"] === "cancel") {
+    } else if (params.get("openid.mode") === "error") {
+      throw new Error(params.get("openid.error") as string);
+    } else if (params.get("openid.mode") === "cancel") {
       throw new Error("Authentication cancelled.");
     }
   }
@@ -225,9 +228,9 @@ export class SteamOpenIdClient implements OpenId {
   }
 
   private async verifyDiscoveredInformation(
-    params: ParsedUrlQuery,
+    params: URLSearchParams,
   ): Promise<ProviderResponse> {
-    const claimedIdentifier = params["openid.claimed_id"] as string | undefined;
+    const claimedIdentifier = params.get("openid.claimed_id");
     if (!claimedIdentifier) {
       throw new Error(
         `Could not obtain claimed identifier. Params: ${JSON.stringify(params)}`,
@@ -243,33 +246,26 @@ export class SteamOpenIdClient implements OpenId {
       );
     }
 
-    if (!params["openid.signed"] || !params["openid.sig"]) {
+    if (!params.get("openid.signed") || !params.get("openid.sig")) {
       throw new Error("No signature in response.");
     }
 
     return {
       authenticated: true,
-      claimedIdentifier: params["openid.claimed_id"] as string,
+      claimedIdentifier: params.get("openid.claimed_id") as string,
     };
   }
 
-  private async buildUrl(
-    theUrl: string,
-    params: Record<string, string>,
-  ): Promise<string> {
-    const parsedUrl = url.parse(theUrl, true);
-    parsedUrl.search = null;
+  private buildUrl(theUrl: string, params: Record<string, string>): string {
+    const parsedUrl = new URL(theUrl);
+    parsedUrl.search = ""; // clear any previous params
 
     if (params) {
-      if (!parsedUrl.query) {
-        parsedUrl.query = params;
-      } else {
-        for (const key in params) {
-          parsedUrl.query[key] = params[key];
-        }
+      for (const key in params) {
+        parsedUrl.searchParams.set(key, params[key]);
       }
     }
 
-    return url.format(parsedUrl);
+    return parsedUrl.toString();
   }
 }
