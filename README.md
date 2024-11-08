@@ -1,4 +1,4 @@
-# steam-lightweight-openid
+# steam-openid-fetch
 
 **This is a fork of [Proxxx23/simple-openid](https://github.com/Proxxx23/simple-openid) that uses the native `fetch` API instead of `axios` in order to support non-node.js runtimes like Cloudflare Workers**
 
@@ -7,7 +7,7 @@ This package is designed to utilise Steam OpenId 2.0 in a lightweight and easy w
 To run it, example for Steam API:
 
 ```ts
-import { OpenIdClient } from 'steam-lightweight-openid';
+import { OpenIdClient } from 'steam-openid-fetch';
 
 const client = new OpenIdClient();
 const STEAM_OPENID_URL = 'https://steamcommunity.com/openid';
