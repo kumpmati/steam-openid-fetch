@@ -1,19 +1,22 @@
-import { get } from './http';
-import { Provider } from './index';
+import { get } from "./http";
+import { Provider } from "./index";
 
 type ParsedService = {
-  priority: number,
-  type: string,
+  priority: number;
+  type: string;
 };
 
 type Service = Partial<{
-  uri: string,
-}> & ParsedService;
+  uri: string;
+}> &
+  ParsedService;
 
 export const parseXrdsData = (data: string): Service[] => {
-  data = data.replaceAll(/[\n\r]/g, '');
+  data = data.replaceAll(/[\n\r]/g, "");
   const services: Service[] = [];
-  const serviceMatches = data.match(/<Service\s*(priority="\d+")?.*?>(.*?)<\/Service>/g);
+  const serviceMatches = data.match(
+    /<Service\s*(priority="\d+")?.*?>(.*?)<\/Service>/g,
+  );
 
   if (!serviceMatches) {
     return services;
@@ -32,13 +35,11 @@ export const parseXrdsData = (data: string): Service[] => {
 
     let typeMatch: RegExpExecArray | null = null;
     const typeRegex = /<Type(\s+.*?)?>(.*?)<\/Type\s*?>/g;
-    while (typeMatch = typeRegex.exec(service)) {
-      svcs.push(
-        {
-          priority: priority,
-          type: typeMatch[2]
-        }
-      );
+    while ((typeMatch = typeRegex.exec(service))) {
+      svcs.push({
+        priority: priority,
+        type: typeMatch[2],
+      });
     }
 
     if (svcs.length === 0) {
@@ -58,14 +59,16 @@ export const parseXrdsData = (data: string): Service[] => {
     services.push(...svcs);
   }
 
-  services.sort((a, b) => a.priority < b.priority
-    ? -1
-    : (a.priority === b.priority ? 0 : 1));
+  services.sort((a, b) =>
+    a.priority < b.priority ? -1 : a.priority === b.priority ? 0 : 1,
+  );
 
   return services;
 };
 
-const retrieveProvidersFromXrds = async (xrdsData: string): Promise<Provider[] | undefined> => {
+const retrieveProvidersFromXrds = async (
+  xrdsData: string,
+): Promise<Provider[] | undefined> => {
   const services = parseXrdsData(xrdsData);
   if (services.length === 0) {
     return undefined;
@@ -73,31 +76,33 @@ const retrieveProvidersFromXrds = async (xrdsData: string): Promise<Provider[] |
 
   const providers: Provider[] = [];
   for (const srv of services) {
-    providers.push(
-      {
-        endpoint: srv.uri,
-        version: 'http://specs.openid.net/auth/2.0',
-      }
-    );
+    providers.push({
+      endpoint: srv.uri,
+      version: "http://specs.openid.net/auth/2.0",
+    });
   }
 
   return providers;
 };
 
-export const resolveXri = async (xriUrl: string): Promise<Provider[] | undefined> => {
+export const resolveXri = async (
+  xriUrl: string,
+): Promise<Provider[] | undefined> => {
   const { data, status, headers } = await get(xriUrl);
   if (!data || status !== 200) {
     throw new Error(`Could not resolve XRI from URL: ${xriUrl}`);
   }
 
-  const contentType = headers?.['content-type'];
+  const contentType = headers?.["content-type"];
   if (!contentType) {
-    throw new Error(`Could not resolve XRI from URL: ${xriUrl} due to missing content-type header.`);
+    throw new Error(
+      `Could not resolve XRI from URL: ${xriUrl} due to missing content-type header.`,
+    );
   }
 
-  if (!contentType.includes('application/xrds+xml')) {
+  if (!contentType.includes("application/xrds+xml")) {
     throw new Error(
-      `Could not resolve XRI: ${xriUrl} due to invalid content-type header. Content type: ${contentType}. Expected: application/xrds+xml.`
+      `Could not resolve XRI: ${xriUrl} due to invalid content-type header. Content type: ${contentType}. Expected: application/xrds+xml.`,
     );
   }
 
