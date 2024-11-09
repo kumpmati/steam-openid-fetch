@@ -1,6 +1,6 @@
 # steam-openid-fetch
 
-**This is a fork of [Proxxx23/simple-openid](https://github.com/Proxxx23/simple-openid) that uses the native `fetch` API instead of `axios` in order to support non-node.js runtimes like Cloudflare Workers**
+**This is a fork of [Proxxx23/simple-openid](https://github.com/Proxxx23/simple-openid) that uses native Web APIs in order to support non-Node.js runtimes like Cloudflare Workers.**
 
 This package is designed to utilise Steam OpenId 2.0 in a lightweight and easy way.
 
